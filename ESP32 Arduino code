@@ -1,0 +1,132 @@
+#include <WiFi.h>
+#include <ThingSpeak.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "DHT.h"
+// WiFi credentials
+const char* ssid = "INAYAKHAN";
+const char* password = "inaya1630";
+// ThingSpeak details
+unsigned long channelID = 3309479;
+const char* writeAPIKey = "UDZVZEE69OSGF1AY";
+WiFiClient client;
+// OLED display
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -
+1);
+// DHT sensor
+#define DHTPIN 27
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+// Sensors
+#define MQ4_PIN 34
+#define SOIL_PIN 35
+// Relay outputs
+#define HEATER 19
+#define FAN 18
+#define MOTOR 5
+// Day counter
+int dayCount = 1;
+unsigned long previousDayMillis = 0;
+const long dayInterval = 86400000;
+void setup()
+{
+ Serial.begin(115200);
+ dht.begin();
+ pinMode(HEATER, OUTPUT);
+ pinMode(FAN, OUTPUT);
+ pinMode(MOTOR, OUTPUT);
+ digitalWrite(HEATER, LOW);
+ digitalWrite(FAN, LOW);
+ digitalWrite(MOTOR, LOW);
+ Wire.begin();
+ if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+ Serial.println("OLED fail");
+ while(true);
+ }
+ WiFi.begin(ssid, password);
+ Serial.print("Connecting WiFi");
+ while(WiFi.status() != WL_CONNECTED)
+ {
+ delay(500);
+ Serial.print(".");
+ }
+ Serial.println("Connected");
+ ThingSpeak.begin(client);
+}
+void loop()
+{
+ if (millis() - previousDayMillis >= dayInterval)
+{
+ previousDayMillis = millis();
+ dayCount++;
+ if(dayCount > 7) dayCount = 7;
+ 
+}
+ float temp = dht.readTemperature();
+ float hum = dht.readHumidity();
+ int gas = analogRead(MQ4_PIN);
+ int soil = analogRead(SOIL_PIN);
+ digitalWrite(HEATER, LOW);
+ digitalWrite(FAN, LOW);
+ digitalWrite(MOTOR, LOW);
+ if (temp < 30)
+ 
+{
+ digitalWrite(HEATER, HIGH);
+ 
+}
+ else if (temp > 40 || gas > 500)
+ 
+{
+ digitalWrite(FAN, HIGH);
+ 
+}
+ else
+ 
+{
+ digitalWrite(MOTOR, HIGH);
+ delay(2000);
+ digitalWrite(MOTOR, LOW);
+ 
+}
+ display.clearDisplay();
+ display.setTextSize(1);
+ display.setCursor(0,0);
+ display.print("Temp: ");
+ display.print(temp);
+ display.println("C");
+display.print("Hum: ");
+ display.print(hum);
+ display.println("%");
+ display.print("Soil: ");
+ display.println(soil);
+ display.print("Gas: ");
+ display.println(gas);
+ display.display();
+ delay(5000);
+ display.clearDisplay();
+ display.setTextSize(2);
+ display.setCursor(0,0);
+ display.print("Day ");
+ display.println(dayCount);
+ display.setTextSize(1);
+ display.setCursor(0,40);
+ display.print("Left: ");
+ display.print(7 - dayCount);
+ display.println(" days");
+ display.display();
+ delay(3000);
+ ThingSpeak.setField(1, temp);
+ ThingSpeak.setField(2, hum);
+ ThingSpeak.setField(3, soil);
+ ThingSpeak.setField(4, gas);
+ int x = ThingSpeak.writeFields(channelID, writeAPIKey);
+ if(x == 200)
+ Serial.println("Data sent");
+else
+ Serial.println("Error");
+ delay(15000);
+}
